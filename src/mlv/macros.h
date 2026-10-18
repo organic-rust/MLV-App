@@ -21,15 +21,17 @@
 #define getMlvFrames(video) (video)->frames
 #define getMlvBitdepth(video) (video)->RAWI.raw_info.bits_per_pixel
 #define getMlvCompression(video) \
-    (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_JPEG2K)   ? "JPEG2000" : \
+    (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX)      ? "CRX lossless" : \
+     ((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_JPEG2K)   ? "JPEG2000" : \
      ((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92)     ? "Lossless"  : \
      "Uncompressed")
 #define isMlvLj92(video)      (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92) ? 1 : 0)
 #define isMlvJpeg2000(video)  (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_JPEG2K) ? 1 : 0)
 #define isMlvPackLsb(video)   (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_PACK_LSB) ? 1 : 0)
+#define isMlvCrx(video)       (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX) ? 1 : 0)
 #define isMlvCompressed(video) \
     (((video)->MLVI.videoClass & \
-      (MLV_VIDEO_CLASS_FLAG_LJ92 | MLV_VIDEO_CLASS_FLAG_JPEG2K)) ? 1 : 0)
+      (MLV_VIDEO_CLASS_FLAG_LJ92 | MLV_VIDEO_CLASS_FLAG_JPEG2K | MLV_VIDEO_CLASS_FLAG_CRX)) ? 1 : 0)
 #define getMlvFramerate(video) (video)->frame_rate
 #define getMlvFramerateOrig(video) (double)(video->MLVI.sourceFpsNom / (double)video->MLVI.sourceFpsDenom)
 #define getMlvFrameNumber(video, frame_index) (video)->video_index[(frame_index)].frame_number

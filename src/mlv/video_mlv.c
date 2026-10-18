@@ -21,6 +21,7 @@
 #include "raw.h"
 #include "mlv.h"
 #include "pack_lsb.h"
+#include "crx/crx_decoder.h"
 #include "llrawproc/llrawproc.h"
 #include "mcraw/mcraw.h"
 
@@ -317,7 +318,42 @@ int getMlvRawFrameUint16(mlvObject_t * video, uint64_t frameIndex, uint16_t * un
 
         file_set_pos(file, frame_offset, SEEK_SET);
 
-        if (video->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92)
+        if (isMlvCrx(video))
+        {
+            /* the frame block can be a little larger than the raw frame
+             * (mlv_lite's slot padding) */
+            if (frame_size > (uint32_t)raw_frame_size)
+            {
+                uint8_t * bigger = (uint8_t *)realloc(raw_frame, frame_size + 4);
+                if (!bigger)
+                {
+                    free(raw_frame);
+                    pthread_mutex_unlock(video->main_file_mutex + chunk);
+                    return 1;
+                }
+                raw_frame = bigger;
+            }
+            if(fread(raw_frame, frame_size, 1, file) != 1)
+            {
+                DEBUG( printf("Frame data read error crx\n"); )
+                free(raw_frame);
+                pthread_mutex_unlock(video->main_file_mutex + chunk);
+                return 1;
+            }
+
+            pthread_mutex_unlock(video->main_file_mutex + chunk);
+
+            /* mlv_lite uses Canon's reduced-raw encoder setup: lossless,
+             * planes in GRBG order relative to the frame */
+            int ret = crx_decode_frame(raw_frame, frame_size, width, height, bitdepth, 1, 0, unpackedFrame);
+            if (ret)
+            {
+                DEBUG( printf("CRX decoder: failed with error code (%d)\n", ret); )
+                free(raw_frame);
+                return 1;
+            }
+        }
+        else if (video->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92)
         {
             if(fread(raw_frame, frame_size, 1, file) != 1)
             {
@@ -1755,7 +1791,20 @@ int saveMlvAVFrame(mlvObject_t * video, FILE * output_mlv, int export_audio, int
                     free(block_buf);
                     return 1;
                 }
-                if(isMlvCompressed(video))
+                if(isMlvCrx(video))
+                {
+                    int ret = crx_decode_frame((uint8_t*)frame_buf, frame_size, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel, 1, 0, frame_buf_unpacked);
+                    if(ret)
+                    {
+                        sprintf(error_message, "Averaging: could not decode CRX frame: error %d", ret);
+                        DEBUG( printf("\n%s\n", error_message); )
+                        free(frame_buf_unpacked);
+                        free(frame_buf);
+                        free(block_buf);
+                        return 1;
+                    }
+                }
+                else if(isMlvCompressed(video))
                 {
                     int ret = dng_decompress_image(frame_buf_unpacked, (uint16_t*)frame_buf, frame_size, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel);
                     if(ret != LJ92_ERROR_NONE)

@@ -166,6 +166,7 @@ SOURCES += \
     ../../src/mlv/video_mlv.c \
     ../../src/mlv/video_mlv_misc.c \
     ../../src/mlv/liblj92/lj92.c \
+    ../../src/mlv/crx/crx_decoder.cpp \
     ../../src/mlv/llrawproc/llrawproc.c \
     ../../src/mlv/llrawproc/pixelproc.c \
     ../../src/mlv/llrawproc/stripes.c \
@@ -307,6 +308,7 @@ jpeg2k_enabled {
 macx: SOURCES += ../cocoa/avf_lib/avf_lib.m
 
 HEADERS += MainWindow.h \
+    ../../src/mlv/crx/crx_decoder.h \
     ../../src/debayer/debayer.h \
     ../../src/debayer/helpersse2.h \
     ../../src/debayer/conv.h \

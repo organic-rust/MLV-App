@@ -7,7 +7,7 @@ objects = main.o video_mlv.o debayer.o amaze_demosaic.o raw_processing.o \
 		  camera_matrices.o frame_caching.o lj92.o session_methods.o \
 		  delegate.o mlv_view.o llrawproc.o pixelproc.o stripes.o \
 		  patternnoise.o hist.o dualiso.o avf_lib.o filter.o genann.o \
-		  blur_threaded.o dng.o darkframe.o camera_id.o audio_mlv.o
+		  blur_threaded.o dng.o darkframe.o camera_id.o audio_mlv.o crx_decoder.o
 
 # All macOS frameworks for the link
 frameworks = -framework Cocoa -framework AppKit -framework Foundation \
@@ -20,7 +20,7 @@ OCC = clang # Objective C
 
 # Flags for link and objects
 mainflags = -mmacosx-version-min=10.10 -O3 -Ofast -m64 -DNDEBUG
-linkflags = $(mainflags) -lm -pthread -lobjc
+linkflags = $(mainflags) -lm -pthread -lobjc -lc++
 cflags := $(mainflags) -c -std=c99
 objcflags := $(cflags) -x objective-c
 
@@ -106,6 +106,9 @@ matrix.o : ../../src/matrix/matrix.c
 	$(CC) $(cflags) ../../src/matrix/matrix.c
 camera_id.o : ../../src/mlv/camid/camera_id.c
 	$(CC) $(cflags) ../../src/mlv/camid/camera_id.c
+
+crx_decoder.o : ../../src/mlv/crx/crx_decoder.cpp
+	clang++ $(mainflags) -c -std=c++11 ../../src/mlv/crx/crx_decoder.cpp
 llrawproc.o : ../../src/mlv/llrawproc/llrawproc.c
 	$(CC) $(cflags) ../../src/mlv/llrawproc/llrawproc.c
 darkframe.o : ../../src/mlv/llrawproc/darkframe.c
