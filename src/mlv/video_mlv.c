@@ -2603,6 +2603,15 @@ int openMlvClip(mlvObject_t * video, char * mlvPath, int open_mode, char * error
 
 short_cut:
 
+    /* Camera not in camid: use the clip's own matrix and name for DNG export,
+     * not the default camera's (the viewer already uses the MLV matrix) */
+    if (video->IDNT.blockType[0] && !camidCheckIfCameraKnown(video->IDNT.cameraModel))
+    {
+        camidFromMatrix(&video->camid, video->IDNT.cameraModel,
+                        (const char *)video->IDNT.cameraName,
+                        video->RAWI.raw_info.color_matrix1);
+    }
+
     /* Set imaginary lossless bit depth */
     setMlvLosslessBpp(video);
     /* Check and set dual iso validity */

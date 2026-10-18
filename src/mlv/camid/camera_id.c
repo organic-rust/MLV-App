@@ -337,6 +337,22 @@ static camera_id_t camera_id[] = {
         { 4000000, 594 },
         2
     },
+    {
+        /* ML M6II.111 port. Only Adobe's D65 matrix is known here (LibRaw
+         * colordata, same values ML writes to RAWI), so it is used for both
+         * illuminants; forward matrices are derived from it as in
+         * camidFromMatrix(). Replace with Adobe DNG Converter values when
+         * available. Focal plane from a CR3 (IMG_9843). */
+        0x80000811,
+        { "Canon EOS M6 Mark II", NULL, NULL },
+        { 11498, 10000, -3759, 10000, -1516, 10000, -5073, 10000, 12954, 10000, 2349, 10000, -892, 10000, 1867, 10000, 6118, 10000 },
+        { 11498, 10000, -3759, 10000, -1516, 10000, -5073, 10000, 12954, 10000, 2349, 10000, -892, 10000, 1867, 10000, 6118, 10000 },
+        { 5822, 10000, 3371, 10000, 448, 10000, 2273, 10000, 9884, 10000, -2157, 10000, 97, 10000, -1823, 10000, 9979, 10000 },
+        { 5822, 10000, 3371, 10000, 448, 10000, 2273, 10000, 9884, 10000, -2157, 10000, 97, 10000, -1823, 10000, 9979, 10000 },
+        { 6960000, 877 },
+        { 4640000, 585 },
+        2
+    },
 	{ 
 		0x00000000,
         { "Unknown Camera", "Using 5D3", "Matrixes & Focal Info" },
@@ -416,3 +432,81 @@ camera_id_t* camidGet(uint32_t cameraModel)
     return &camera_id[camera_id_get_current_cam(cameraModel)];
 }
 
+
+/* For cameras not in the table: build a camid from the single D65 colour
+ * matrix an MLV carries (RAWI color_matrix1), instead of the default
+ * camera's. Both colour matrices get it; the forward matrices are derived
+ * as FM = Bradford(D65->D50) * inverse(CM) * diag(CM * D65 white), which
+ * maps (1,1,1) to the D50 white point, so DNGs stay self-consistent.
+ * Returns 0 if the matrix is unusable (all zero or singular). */
+int camidFromMatrix(camera_id_t *camid, uint32_t cameraModel, const char *name, const int32_t *cm)
+{
+    double m[3][3], inv[3][3];
+    for (int i = 0; i < 9; i++)
+    {
+        if (cm[i * 2 + 1] == 0) return 0;
+        m[i / 3][i % 3] = (double)cm[i * 2] / cm[i * 2 + 1];
+    }
+    double det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+               - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+               + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    if (det > -1e-9 && det < 1e-9) return 0;
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+        {
+            /* adjugate / det */
+            int i1 = (j + 1) % 3, i2 = (j + 2) % 3, j1 = (i + 1) % 3, j2 = (i + 2) % 3;
+            inv[i][j] = (m[i1][j1] * m[i2][j2] - m[i1][j2] * m[i2][j1]) / det;
+        }
+
+    const double d65[3] = { 0.95047, 1.0, 1.08883 };
+    const double d50[3] = { 0.96422, 1.0, 0.82521 };
+    const double mb[3][3] = { { 0.8951, 0.2664, -0.1614 }, { -0.7502, 1.7135, 0.0367 }, { 0.0389, -0.0685, 1.0296 } };
+    const double mbi[3][3] = { { 0.9869929, -0.1470543, 0.1599627 }, { 0.4323053, 0.5183603, 0.0492912 }, { -0.0085287, 0.0400428, 0.9684867 } };
+    double s[3], t[3], n[3], bradford[3][3], fm[3][3];
+    for (int i = 0; i < 3; i++)
+    {
+        s[i] = t[i] = n[i] = 0;
+        for (int k = 0; k < 3; k++)
+        {
+            s[i] += mb[i][k] * d65[k];
+            t[i] += mb[i][k] * d50[k];
+            n[i] += m[i][k] * d65[k];
+        }
+    }
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+        {
+            bradford[i][j] = 0;
+            for (int k = 0; k < 3; k++)
+                bradford[i][j] += mbi[i][k] * (t[k] / s[k]) * mb[k][j];
+        }
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+        {
+            fm[i][j] = 0;
+            for (int k = 0; k < 3; k++)
+                fm[i][j] += bradford[i][k] * inv[k][j];
+            fm[i][j] *= n[j];
+        }
+
+    camid->cameraModel = cameraModel;
+    camid->cameraName[UNIQ] = name;
+    camid->cameraName[LOC1] = NULL;
+    camid->cameraName[LOC2] = NULL;
+    for (int i = 0; i < 18; i++)
+    {
+        camid->ColorMatrix1[i] = camid->ColorMatrix2[i] = cm[i];
+    }
+    for (int i = 0; i < 9; i++)
+    {
+        int v = (int)(fm[i / 3][i % 3] * 10000.0 + (fm[i / 3][i % 3] < 0 ? -0.5 : 0.5));
+        camid->ForwardMatrix1[i * 2] = camid->ForwardMatrix2[i * 2] = v;
+        camid->ForwardMatrix1[i * 2 + 1] = camid->ForwardMatrix2[i * 2 + 1] = 10000;
+    }
+    /* focal plane resolution unknown */
+    camid->focal_resolution_x[0] = camid->focal_resolution_y[0] = 0;
+    camid->focal_resolution_x[1] = camid->focal_resolution_y[1] = 1;
+    camid->focal_unit = 2;
+    return 1;
+}

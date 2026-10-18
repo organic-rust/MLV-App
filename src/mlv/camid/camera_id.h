@@ -54,5 +54,7 @@ int32_t camidGetFocalUnit(uint32_t cameraModel);
 int camidCheckIfCameraKnown(uint32_t cameraModel);
 
 camera_id_t* camidGet(uint32_t cameraModel);
+/* Build a camid for an unlisted camera from an MLV's single D65 matrix */
+int camidFromMatrix(camera_id_t *camid, uint32_t cameraModel, const char *name, const int32_t *cm);
 
 #endif
