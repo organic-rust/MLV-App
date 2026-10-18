@@ -2742,6 +2742,32 @@ void printMlvInfo(mlvObject_t * video)
     printf("     Bits / Pixel: %i\n\n", video->RAWI.raw_info.bits_per_pixel);
 }
 
+/* White balance as the camera recorded it in WBAL gains (1024 / camera gain:
+ * the raw colour of something neutral), as this program's temperature and
+ * tint: the WB picker's search on a pixel of that colour.  For clips whose
+ * auto white balance comes with its gains (Magic Lantern on the EOS M6 II).
+ * Returns 0 if the clip has no gains. */
+int getMlvWhiteBalanceFromGains(mlvObject_t *video, int *wbTemp, int *wbTint)
+{
+    if (!video->WBAL.wbgain_r || !video->WBAL.wbgain_g || !video->WBAL.wbgain_b) return 0;
+    processingObject_t * processing = video->processing;
+
+    /* a mid-grey pixel of that colour, before black/white levels, as the
+     * picker gets it from getMlvRawFrameDebayered */
+    double level = (processing->white_level - processing->black_level) * 0.4;
+    uint16_t pixel[3];
+    pixel[0] = processing->black_level + level * video->WBAL.wbgain_r / video->WBAL.wbgain_g;
+    pixel[1] = processing->black_level + level;
+    pixel[2] = processing->black_level + level * video->WBAL.wbgain_b / video->WBAL.wbgain_g;
+
+    /* the search renders through the camera matrix, as the GUI will */
+    int use_cam_matrix = processing->use_cam_matrix;
+    if (!use_cam_matrix) processingUseCamMatrix(processing);
+    processingFindWhiteBalance(processing, 1, 1, pixel, 0, 0, wbTemp, wbTint, 0);
+    processing->use_cam_matrix = use_cam_matrix;
+    return 1;
+}
+
 /* WB Picker function; selects the pic and sends task to processing module */
 void findMlvWhiteBalance(mlvObject_t *video, uint64_t frameIndex, int posX, int posY, int *wbTemp, int *wbTint, int mode)
 {
