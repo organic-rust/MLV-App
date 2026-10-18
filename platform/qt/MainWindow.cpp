@@ -9981,7 +9981,17 @@ void MainWindow::setWhiteBalanceFromMlv(ReceiptSettings *sliders)
 {
     switch( getMlvWbMode( m_pMlvObject ) )
     {
-    case 0: //Auto - use default
+    case 0: //Auto - use default, unless the camera recorded its AWB result
+        //Magic Lantern on the EOS M6 II records the colour temperature AWB
+        //applied; other cameras record the Kelvin setting, unrelated to AWB
+        if( getMlvCameraModel( m_pMlvObject ) == 0x80000811
+         && getMlvWbKelvin( m_pMlvObject ) >= 2000 && getMlvWbKelvin( m_pMlvObject ) <= 10000 )
+        {
+            sliders->setTemperature( getMlvWbKelvin( m_pMlvObject ) );
+            break;
+        }
+        sliders->setTemperature( 6000 );
+        break;
     case 6: //Custom - use default
         sliders->setTemperature( 6000 );
         break;
