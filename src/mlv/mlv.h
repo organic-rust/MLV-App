@@ -34,6 +34,8 @@
 #define MLV_VIDEO_CLASS_FLAG_DELTA      0x40
 #define MLV_VIDEO_CLASS_FLAG_LJ92       0x20
 #define MLV_VIDEO_CLASS_FLAG_JPEG2K     0x10
+/* uncompressed frames in the DIGIC 8 LSB-first bit order, see pack_lsb.h */
+#define MLV_VIDEO_CLASS_FLAG_PACK_LSB   0x200
 
 #define MLV_AUDIO_CLASS_FLAG_LZMA       0x80
 

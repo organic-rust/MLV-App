@@ -26,6 +26,7 @@
      "Uncompressed")
 #define isMlvLj92(video)      (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92) ? 1 : 0)
 #define isMlvJpeg2000(video)  (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_JPEG2K) ? 1 : 0)
+#define isMlvPackLsb(video)   (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_PACK_LSB) ? 1 : 0)
 #define isMlvCompressed(video) \
     (((video)->MLVI.videoClass & \
       (MLV_VIDEO_CLASS_FLAG_LJ92 | MLV_VIDEO_CLASS_FLAG_JPEG2K)) ? 1 : 0)

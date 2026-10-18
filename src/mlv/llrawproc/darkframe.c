@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "darkframe.h"
+#include "../pack_lsb.h"
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -133,7 +134,7 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
     }
 
     /* Allocate dark frame data buffer */
-    uint8_t * df_packed_buf = calloc(df_mlv.video_index[0].frame_size, 1);
+    uint8_t * df_packed_buf = calloc(df_mlv.video_index[0].frame_size + 4, 1); // slack for unpack_lsb_image_bits
     if(!df_packed_buf)
     {
         sprintf(err_msg, "Packed buffer allocation error");
@@ -188,7 +189,10 @@ static int df_load_ext(mlvObject_t * video, char * error_message)
     /* Allocate the dark frame 16bit buffer */
     video->llrawproc->dark_frame_size = df_mlv.RAWI.xRes * df_mlv.RAWI.yRes * 2;
     video->llrawproc->dark_frame_data = calloc(video->llrawproc->dark_frame_size + 4, 1);
-    dng_unpack_image_bits(video->llrawproc->dark_frame_data, (uint16_t*)df_packed_buf, df_mlv.RAWI.xRes, df_mlv.RAWI.yRes, df_mlv.RAWI.raw_info.bits_per_pixel);
+    if((df_mlv.MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_PACK_LSB))
+        unpack_lsb_image_bits(video->llrawproc->dark_frame_data, df_packed_buf, df_mlv.RAWI.xRes, df_mlv.RAWI.yRes, df_mlv.RAWI.raw_info.bits_per_pixel);
+    else
+        dng_unpack_image_bits(video->llrawproc->dark_frame_data, (uint16_t*)df_packed_buf, df_mlv.RAWI.xRes, df_mlv.RAWI.yRes, df_mlv.RAWI.raw_info.bits_per_pixel);
 #ifndef STDOUT_SILENT
     printf("DF: initialized Ext mode\n");
 #endif

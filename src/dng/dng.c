@@ -33,6 +33,7 @@
 #include "../mlv/camid/camera_id.h"
 
 #include "../mlv/liblj92/lj92.h"
+#include "../mlv/pack_lsb.h"
 #include "../mlv/llrawproc/llrawproc.h"
 #include "../mlv/mcraw/mcraw.h"
 #include "../mlv/macros.h"
@@ -1049,17 +1050,39 @@ static int dng_get_frame(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_
 #endif
             }
 
-            if(dng_data->raw_output_state == UNCOMPRESSED_ORIG)
+            if(dng_data->raw_output_state == UNCOMPRESSED_ORIG && (mlv_data->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_PACK_LSB))
+            {
+                /* no byte swap gives DNG's bit order here: repack, without raw processing */
+                unpack_lsb_image_bits(dng_data->image_buf_unpacked,
+                                      (uint8_t *)dng_data->image_buf,
+                                      mlv_data->RAWI.xRes,
+                                      mlv_data->RAWI.yRes,
+                                      mlv_data->RAWI.raw_info.bits_per_pixel);
+                dng_pack_image_bits(dng_data->image_buf,
+                                    dng_data->image_buf_unpacked,
+                                    mlv_data->RAWI.xRes,
+                                    mlv_data->RAWI.yRes,
+                                    mlv_data->RAWI.raw_info.bits_per_pixel,
+                                    1);
+            }
+            else if(dng_data->raw_output_state == UNCOMPRESSED_ORIG)
             {
                 dng_reverse_byte_order(dng_data->image_buf, dng_data->image_size);
             }
             else
             {
-                dng_unpack_image_bits(dng_data->image_buf_unpacked,
-                                      dng_data->image_buf,
-                                      mlv_data->RAWI.xRes,
-                                      mlv_data->RAWI.yRes,
-                                      mlv_data->RAWI.raw_info.bits_per_pixel);
+                if((mlv_data->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_PACK_LSB))
+                    unpack_lsb_image_bits(dng_data->image_buf_unpacked,
+                                          (uint8_t *)dng_data->image_buf,
+                                          mlv_data->RAWI.xRes,
+                                          mlv_data->RAWI.yRes,
+                                          mlv_data->RAWI.raw_info.bits_per_pixel);
+                else
+                    dng_unpack_image_bits(dng_data->image_buf_unpacked,
+                                          dng_data->image_buf,
+                                          mlv_data->RAWI.xRes,
+                                          mlv_data->RAWI.yRes,
+                                          mlv_data->RAWI.raw_info.bits_per_pixel);
 
                 /* apply low level raw processing to the unpacked_frame */
                 applyLLRawProcObject(mlv_data, dng_data->image_buf_unpacked, dng_data->image_size_unpacked);
