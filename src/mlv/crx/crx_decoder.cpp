@@ -2432,6 +2432,18 @@ extern "C" int crx_decode_frame(const uint8_t *data, uint32_t size,
 {
   if (!data || size < 12 || data[0] != 0xFF || data[1] != 0x01)
     return -1;
+  if (levels < 0)
+  {
+    // from the sample: subband headers (FF03) after the first plane header
+    // (FF02) are 3 * levels + 1 - 1 for lossless, 10 for C-RAW
+    uint32_t o = 12, subbands = 0;
+    if (o + 12 <= size && data[o] == 0xFF && data[o + 1] == 0x02)
+      for (o += 12; o + 12 <= size && data[o] == 0xFF && data[o + 1] == 0x03; o += 12)
+        subbands++;
+    if (subbands == 0 || (subbands - 1) % 3)
+      return -1;
+    levels = (int)(subbands - 1) / 3;
+  }
   if (width <= 0 || height <= 0 || (width & 1) || (height & 1) ||
       bits < 9 || bits > 14 || cfa_layout < 0 || cfa_layout > 3 ||
       levels < 0 || levels > 3)

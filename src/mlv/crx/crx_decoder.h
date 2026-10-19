@@ -12,7 +12,8 @@ extern "C" {
  * MLV_VIDEO_CLASS_FLAG_CRX, into width x height 16-bit Bayer values.
  * cfa_layout: plane-to-Bayer order (0 RGGB, 1 GRBG, 2 GBRG, 3 BGGR);
  * mlv_lite's encoder (Canon's reduced-raw setup) uses 1.
- * levels: wavelet levels, 0 = lossless.  Returns 0 on success. */
+ * levels: wavelet levels, 0 = lossless, 3 = C-RAW; -1 = from the sample's
+ * subband headers.  Returns 0 on success. */
 int crx_decode_frame(const uint8_t *data, uint32_t size,
                      int width, int height, int bits,
                      int cfa_layout, int levels, uint16_t *out);
