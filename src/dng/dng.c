@@ -34,6 +34,7 @@
 
 #include "../mlv/liblj92/lj92.h"
 #include "../mlv/pack_lsb.h"
+#include "../mlv/crx/crx_decoder.h"
 #include "../mlv/llrawproc/llrawproc.h"
 #include "../mlv/mcraw/mcraw.h"
 #include "../mlv/macros.h"
@@ -980,6 +981,70 @@ static int dng_get_frame(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_
                                 1);
         }
     }
+    else if (isMlvCrx(mlv_data))
+    {
+        /* CRX (Canon's CR3 codec, mlv_lite on DIGIC 8) has no DNG
+         * equivalent: decode it, then write lossless or uncompressed */
+        file_set_pos(fd, mlv_data->video_index[frame_index].frame_offset, SEEK_SET);
+
+        size_t stored_size = dng_get_image_size(mlv_data, IMG_SIZE_LOSLESS, frame_index);
+
+        if (stored_size > dng_get_image_size(mlv_data, IMG_SIZE_UNPACKED, frame_index)) {
+            dng_data->image_buf2 = realloc(dng_data->image_buf2, stored_size);
+        }
+
+        if (fread(dng_data->image_buf2, stored_size, 1, fd) != 1)
+        {
+#ifndef STDOUT_SILENT
+            printf("Can not read raw frame from %s\n", mlv_data->path);
+#endif
+            return -1;
+        }
+
+        /* as for playback: Canon's reduced-raw setup, planes in GRBG order */
+        ret = crx_decode_frame((uint8_t*)dng_data->image_buf2,
+                               stored_size,
+                               mlv_data->RAWI.xRes,
+                               mlv_data->RAWI.yRes,
+                               mlv_data->RAWI.raw_info.bits_per_pixel,
+                               1, -1,
+                               dng_data->image_buf_unpacked);
+        if (ret)
+        {
+#ifndef STDOUT_SILENT
+            printf("CRX decoder: failed with error code (%d)\n", ret);
+#endif
+            return -1;
+        }
+
+        /* apply low level raw processing to the unpacked_frame */
+        applyLLRawProcObject(mlv_data, dng_data->image_buf_unpacked, dng_data->image_size_unpacked);
+
+        if(dng_data->raw_output_state == COMPRESSED_RAW)
+        {
+            ret = dng_compress_image(dng_data->image_buf,
+                                     dng_data->image_buf_unpacked,
+                                     &dng_data->image_size,
+                                     mlv_data->RAWI.xRes,
+                                     mlv_data->RAWI.yRes,
+                                     (llrpHQDualIso(mlv_data)) ? 16 : mlv_data->RAWI.raw_info.bits_per_pixel);
+        }
+        else if(!llrpHQDualIso(mlv_data))
+        {
+            dng_data->image_size = dng_get_image_size(mlv_data, IMG_SIZE_PACKED, frame_index);
+            dng_pack_image_bits(dng_data->image_buf,
+                                dng_data->image_buf_unpacked,
+                                mlv_data->RAWI.xRes,
+                                mlv_data->RAWI.yRes,
+                                mlv_data->RAWI.raw_info.bits_per_pixel,
+                                1);
+        }
+        else
+        {
+            dng_data->image_size = dng_get_image_size(mlv_data, IMG_SIZE_UNPACKED, frame_index);
+            memcpy(dng_data->image_buf, dng_data->image_buf_unpacked, dng_data->image_size);
+        }
+    }
     else
     {
         /* Move to start of frame in file and read the RAW data */
@@ -1132,6 +1197,11 @@ dngObject_t * initDngObject(mlvObject_t * mlv_data, int raw_state, double fps, i
 
     dng_data->raw_input_state = (mlv_data->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92) ? COMPRESSED_RAW : UNCOMPRESSED_RAW;
     dng_data->raw_output_state = (dng_data->raw_input_state && (raw_state == 2)) ? COMPRESSED_ORIG : raw_state;
+    if (isMlvCrx(mlv_data) && raw_state == 2)
+    {
+        /* CRX can't pass through into a DNG: closest is lossless */
+        dng_data->raw_output_state = COMPRESSED_RAW;
+    }
 
     dng_data->header_size = HEADER_SIZE;
     dng_data->header_buf = malloc(dng_data->header_size);
