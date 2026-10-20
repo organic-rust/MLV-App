@@ -343,9 +343,11 @@ int getMlvRawFrameUint16(mlvObject_t * video, uint64_t frameIndex, uint16_t * un
 
             pthread_mutex_unlock(video->main_file_mutex + chunk);
 
-            /* mlv_lite uses Canon's reduced-raw encoder setup: lossless,
-             * planes in GRBG order relative to the frame */
-            int ret = crx_decode_frame(raw_frame, frame_size, width, height, bitdepth, 1, -1, unpackedFrame);
+            /* mlv_lite's own encodes use Canon's reduced-raw setup (planes
+             * in GRBG order); RAW burst pre-shoot frames its full-raw one */
+            int ret = crx_decode_frame(raw_frame, frame_size, width, height, bitdepth,
+                                       crxCfaLayout(video->MLVI.videoClass), crxEncType(video->MLVI.videoClass),
+                                       -1, unpackedFrame);
             if (ret)
             {
                 DEBUG( printf("CRX decoder: failed with error code (%d)\n", ret); )
@@ -1793,7 +1795,8 @@ int saveMlvAVFrame(mlvObject_t * video, FILE * output_mlv, int export_audio, int
                 }
                 if(isMlvCrx(video))
                 {
-                    int ret = crx_decode_frame((uint8_t*)frame_buf, frame_size, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel, 1, -1, frame_buf_unpacked);
+                    int ret = crx_decode_frame((uint8_t*)frame_buf, frame_size, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel,
+                                                   crxCfaLayout(video->MLVI.videoClass), crxEncType(video->MLVI.videoClass), -1, frame_buf_unpacked);
                     if(ret)
                     {
                         sprintf(error_message, "Averaging: could not decode CRX frame: error %d", ret);

@@ -1001,13 +1001,15 @@ static int dng_get_frame(mlvObject_t * mlv_data, dngObject_t * dng_data, uint32_
             return -1;
         }
 
-        /* as for playback: Canon's reduced-raw setup, planes in GRBG order */
+        /* as for playback: the encoder setup from the clip's class flags */
         ret = crx_decode_frame((uint8_t*)dng_data->image_buf2,
                                stored_size,
                                mlv_data->RAWI.xRes,
                                mlv_data->RAWI.yRes,
                                mlv_data->RAWI.raw_info.bits_per_pixel,
-                               1, -1,
+                               crxCfaLayout(mlv_data->MLVI.videoClass),
+                               crxEncType(mlv_data->MLVI.videoClass),
+                               -1,
                                dng_data->image_buf_unpacked);
         if (ret)
         {

@@ -39,6 +39,10 @@
 /* Each frame is one CRX sample (Canon's CR3 raw codec, single tile,
  * lossless), recorded by mlv_lite on DIGIC 8; see src/mlv/crx */
 #define MLV_VIDEO_CLASS_FLAG_CRX        0x400
+/* with FLAG_CRX: the frames come from Canon's full-raw encoder setup (M6 II
+ * RAW burst pre-shooting): decorrelated planes (CMP1 encType 3), RGGB plane
+ * order (cfaLayout 0), possibly several tiles */
+#define MLV_VIDEO_CLASS_FLAG_CRX_FULL   0x800
 
 #define MLV_AUDIO_CLASS_FLAG_LZMA       0x80
 

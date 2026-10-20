@@ -21,7 +21,7 @@
 #define getMlvFrames(video) (video)->frames
 #define getMlvBitdepth(video) (video)->RAWI.raw_info.bits_per_pixel
 #define getMlvCompression(video) \
-    (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX)      ? "CRX lossless" : \
+    (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX)      ? "CRX" : \
      ((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_JPEG2K)   ? "JPEG2000" : \
      ((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92)     ? "Lossless"  : \
      "Uncompressed")
@@ -29,6 +29,9 @@
 #define isMlvJpeg2000(video)  (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_JPEG2K) ? 1 : 0)
 #define isMlvPackLsb(video)   (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_PACK_LSB) ? 1 : 0)
 #define isMlvCrx(video)       (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX) ? 1 : 0)
+/* CRX decoder setup (crx_decode_frame): Canon's full-raw encodes or mlv_lite's own */
+#define crxCfaLayout(videoClass) (((videoClass) & MLV_VIDEO_CLASS_FLAG_CRX_FULL) ? 0 : 1)
+#define crxEncType(videoClass)   (((videoClass) & MLV_VIDEO_CLASS_FLAG_CRX_FULL) ? 3 : 0)
 #define isMlvCompressed(video) \
     (((video)->MLVI.videoClass & \
       (MLV_VIDEO_CLASS_FLAG_LJ92 | MLV_VIDEO_CLASS_FLAG_JPEG2K | MLV_VIDEO_CLASS_FLAG_CRX)) ? 1 : 0)

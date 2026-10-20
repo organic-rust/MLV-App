@@ -2428,25 +2428,39 @@ int crxFreeImageData(CrxImage *img)
  * Returns 0 on success. */
 extern "C" int crx_decode_frame(const uint8_t *data, uint32_t size,
                                 int width, int height, int bits,
-                                int cfa_layout, int levels, uint16_t *out)
+                                int cfa_layout, int enc_type, int levels,
+                                uint16_t *out)
 {
   if (!data || size < 12 || data[0] != 0xFF || data[1] != 0x01)
     return -1;
+  // tiles side by side: each a tile header (FF01), then per plane a plane
+  // header (FF02) and its subband headers (FF03), 12 bytes each
+  uint32_t o = 0, tiles = 0, subbands = 0;
+  while (o + 12 <= size && data[o] == 0xFF && data[o + 1] == 0x01)
+  {
+    tiles++;
+    o += 12;
+    int plane = 0;
+    while (o + 12 <= size && data[o] == 0xFF && (data[o + 1] == 0x02 || data[o + 1] == 0x03))
+    {
+      if (data[o + 1] == 0x02)
+        plane++;
+      else if (tiles == 1 && plane == 1)
+        subbands++;
+      o += 12;
+    }
+  }
   if (levels < 0)
   {
-    // from the sample: subband headers (FF03) after the first plane header
-    // (FF02) are 3 * levels + 1 - 1 for lossless, 10 for C-RAW
-    uint32_t o = 12, subbands = 0;
-    if (o + 12 <= size && data[o] == 0xFF && data[o + 1] == 0x02)
-      for (o += 12; o + 12 <= size && data[o] == 0xFF && data[o + 1] == 0x03; o += 12)
-        subbands++;
+    // subbands per plane: 3 * levels + 1 (1 lossless, 10 for C-RAW)
     if (subbands == 0 || (subbands - 1) % 3)
       return -1;
     levels = (int)(subbands - 1) / 3;
   }
   if (width <= 0 || height <= 0 || (width & 1) || (height & 1) ||
       bits < 9 || bits > 14 || cfa_layout < 0 || cfa_layout > 3 ||
-      levels < 0 || levels > 3)
+      (enc_type != 0 && enc_type != 3) || levels < 0 || levels > 3 ||
+      tiles < 1 || tiles > 8 || (width / 2) % tiles)
     return -1;
 
   crx_data_header_t hdr;
@@ -2455,16 +2469,17 @@ extern "C" int crx_decode_frame(const uint8_t *data, uint32_t size,
   hdr.nBits = bits;
   hdr.nPlanes = 4;
   hdr.cfaLayout = cfa_layout;
-  hdr.encType = 0;
+  hdr.encType = enc_type;
   hdr.imageLevels = levels;
-  // one tile: tile header, then per plane a plane header and 3*levels+1
-  // subband headers, 12 bytes each; Canon pads to 8 bytes (108 -> 112)
-  hdr.mdatHdrSize = (12 + 4 * (12 + 12 * (3 * levels + 1)) + 7) & ~7;
+  // Canon pads the headers of all tiles to 8 bytes (one tile: 108 -> 112,
+  // 540 -> 544; two C-RAW tiles: 1080)
+  hdr.mdatHdrSize = (tiles * (12 + 4 * (12 + 12 * (3 * levels + 1))) + 7) & ~7;
   if ((uint32_t)hdr.mdatHdrSize > size)
     return -1;
 
-  // planes are half size (as crxLoadRaw does for 4 planes)
-  hdr.f_width = hdr.tileWidth = width >> 1;
+  // planes are half size (as crxLoadRaw does for 4 planes); equal tiles
+  hdr.f_width = width >> 1;
+  hdr.tileWidth = (width >> 1) / tiles;
   hdr.f_height = hdr.tileHeight = height >> 1;
 
   CrxMemStream stream = {data, size};
@@ -2496,6 +2511,12 @@ extern "C" int crx_decode_frame(const uint8_t *data, uint32_t size,
   for (int plane = 0; plane < 4; ++plane)
     if (results[plane])
       ret = results[plane];
+
+  // encoding type 3 stores the planes decorrelated: back to RGGB rows once
+  // all four are decoded (as crxLoadRaw)
+  if (!ret && img.encType == 3)
+    for (int i = 0; i < img.planeHeight; ++i)
+      crxConvertPlaneLine(&img, i);
 
   crxFreeImageData(&img);
   return ret;
