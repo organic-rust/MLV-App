@@ -43,6 +43,10 @@
  * RAW burst pre-shooting): decorrelated planes (CMP1 encType 3), RGGB plane
  * order (cfaLayout 0), possibly several tiles */
 #define MLV_VIDEO_CLASS_FLAG_CRX_FULL   0x800
+/* with FLAG_CRX_FULL: Canon's full-raw *lossless* encoder (its RAW stills'
+ * one; mlv_lite 1:1 lossless takes): equal tiles, cfaLayout 0 as FULL, but
+ * encType 0 and no wavelet levels */
+#define MLV_VIDEO_CLASS_FLAG_CRX_ENC0   0x1000
 
 #define MLV_AUDIO_CLASS_FLAG_LZMA       0x80
 

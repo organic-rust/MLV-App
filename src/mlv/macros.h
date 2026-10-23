@@ -31,7 +31,8 @@
 #define isMlvCrx(video)       (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX) ? 1 : 0)
 /* CRX decoder setup (crx_decode_frame): Canon's full-raw encodes or mlv_lite's own */
 #define crxCfaLayout(videoClass) (((videoClass) & MLV_VIDEO_CLASS_FLAG_CRX_FULL) ? 0 : 1)
-#define crxEncType(videoClass)   (((videoClass) & MLV_VIDEO_CLASS_FLAG_CRX_FULL) ? 3 : 0)
+#define crxEncType(videoClass)   ((((videoClass) & MLV_VIDEO_CLASS_FLAG_CRX_FULL) && \
+                                   !((videoClass) & MLV_VIDEO_CLASS_FLAG_CRX_ENC0)) ? 3 : 0)
 #define isMlvCompressed(video) \
     (((video)->MLVI.videoClass & \
       (MLV_VIDEO_CLASS_FLAG_LJ92 | MLV_VIDEO_CLASS_FLAG_JPEG2K | MLV_VIDEO_CLASS_FLAG_CRX)) ? 1 : 0)
