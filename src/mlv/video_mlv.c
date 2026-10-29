@@ -20,7 +20,6 @@
 
 #include "raw.h"
 #include "mlv.h"
-#include "pack_lsb.h"
 #include "crx/crx_decoder.h"
 #include "llrawproc/llrawproc.h"
 #include "mcraw/mcraw.h"
@@ -529,24 +528,17 @@ int getMlvRawFrameUint16(mlvObject_t * video, uint64_t frameIndex, uint16_t * un
 
             pthread_mutex_unlock(video->main_file_mutex + chunk);
 
-            if (isMlvPackLsb(video))
+            uint32_t mask = (1 << bitdepth) - 1;
+            #pragma omp parallel for
+            for (int i = 0; i < pixels_count; ++i)
             {
-                unpack_lsb_image_bits(unpackedFrame, raw_frame, width, height, bitdepth);
-            }
-            else
-            {
-                uint32_t mask = (1 << bitdepth) - 1;
-                #pragma omp parallel for
-                for (int i = 0; i < pixels_count; ++i)
-                {
-                    uint32_t bits_offset = i * bitdepth;
-                    uint32_t bits_address = bits_offset / 16;
-                    uint32_t bits_shift = bits_offset % 16;
-                    uint32_t rotate_value = 16 + ((32 - bitdepth) - bits_shift);
-                    uint32_t uncorrected_data = *((uint32_t *)&((uint16_t *)raw_frame)[bits_address]);
-                    uint32_t data = ROR32(uncorrected_data, rotate_value);
-                    unpackedFrame[i] = ((uint16_t)(data & mask));
-                }
+                uint32_t bits_offset = i * bitdepth;
+                uint32_t bits_address = bits_offset / 16;
+                uint32_t bits_shift = bits_offset % 16;
+                uint32_t rotate_value = 16 + ((32 - bitdepth) - bits_shift);
+                uint32_t uncorrected_data = *((uint32_t *)&((uint16_t *)raw_frame)[bits_address]);
+                uint32_t data = ROR32(uncorrected_data, rotate_value);
+                unpackedFrame[i] = ((uint16_t)(data & mask));
             }
         }
     }
@@ -1820,10 +1812,6 @@ int saveMlvAVFrame(mlvObject_t * video, FILE * output_mlv, int export_audio, int
                         return ret;
                     }
                 }
-                else if(isMlvPackLsb(video))
-                {
-                    unpack_lsb_image_bits(frame_buf_unpacked, frame_buf, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel);
-                }
                 else
                 {
                     dng_unpack_image_bits(frame_buf_unpacked, (uint16_t*)frame_buf, video->RAWI.xRes, video->RAWI.yRes, video->RAWI.raw_info.bits_per_pixel);
@@ -1880,10 +1868,10 @@ int saveMlvAVFrame(mlvObject_t * video, FILE * output_mlv, int export_audio, int
                         memcpy(block_buf, &vidf_hdr, sizeof(mlv_vidf_hdr_t));
                         memcpy((block_buf + sizeof(mlv_vidf_hdr_t)), frame_buf, frame_size);
 
-                        /* patch MLVI header and set back videoClass to 1 (uncompressed), keeping the original bit order */
+                        /* patch MLVI header and set back videoClass to 1 (uncompressed) */
                         uint64_t current_pos = file_get_pos(output_mlv);
                         file_set_pos(output_mlv, 32, SEEK_SET);
-                        uint16_t videoClass = 0x1 | (video->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_PACK_LSB);
+                        uint16_t videoClass = 0x1;
                         if(fwrite(&videoClass, sizeof(uint16_t), 1, output_mlv) != 1)
                         {
                             DEBUG( printf("\nCould not patch videoClass in MLV header\n"); )

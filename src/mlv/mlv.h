@@ -34,8 +34,7 @@
 #define MLV_VIDEO_CLASS_FLAG_DELTA      0x40
 #define MLV_VIDEO_CLASS_FLAG_LJ92       0x20
 #define MLV_VIDEO_CLASS_FLAG_JPEG2K     0x10
-/* uncompressed frames in the DIGIC 8 LSB-first bit order, see pack_lsb.h */
-#define MLV_VIDEO_CLASS_FLAG_PACK_LSB   0x200
+/* 0x200 was PACK_LSB (early M6 II takes, LSB-first bit order); no longer read */
 /* Each frame is one CRX sample (Canon's CR3 raw codec, single tile,
  * lossless), recorded by mlv_lite on DIGIC 8; see src/mlv/crx */
 #define MLV_VIDEO_CLASS_FLAG_CRX        0x400
