@@ -21,7 +21,9 @@
 #define getMlvFrames(video) (video)->frames
 #define getMlvBitdepth(video) (video)->RAWI.raw_info.bits_per_pixel
 #define getMlvCompression(video) \
-    (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX)      ? "CRX" : \
+    (((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_CRX)      ? \
+        ((video)->crx_levels == 0 ? "CRX lossless" : \
+         (video)->crx_levels > 0  ? "CRX lossy (C-RAW)" : "CRX") : \
      ((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_JPEG2K)   ? "JPEG2000" : \
      ((video)->MLVI.videoClass & MLV_VIDEO_CLASS_FLAG_LJ92)     ? "Lossless"  : \
      "Uncompressed")

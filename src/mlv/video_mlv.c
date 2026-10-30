@@ -2237,6 +2237,39 @@ short_cut:
 /* Reads an MLV file in to a mlv object(mlvObject_t struct)
  * only puts metadata in to the mlvObject_t,
  * no debayering or bit unpacking */
+/* CRX: the DWT levels of the samples, from the first frames' sample
+ * headers (tile ff01, then per plane ff02 and its 3 * levels + 1 subband
+ * headers ff03, 12 bytes each): the video class doesn't say whether
+ * mlv_lite's single-tile takes are lossless or C-RAW.  -1 if not found
+ * (empty frames are skipped encodes) */
+static int crx_probe_levels(mlvObject_t * video)
+{
+    for (uint32_t f = 0; f < video->frames && f < 8; f++)
+    {
+        int chunk = video->video_index[f].chunk_num;
+        uint8_t h[12 + 4 * 12 * 11];
+        uint32_t n = MIN((uint32_t)sizeof(h), video->video_index[f].frame_size);
+
+        pthread_mutex_lock(video->main_file_mutex + chunk);
+        file_set_pos(video->file[chunk], video->video_index[f].frame_offset, SEEK_SET);
+        int ok = n >= 12 && fread(h, n, 1, video->file[chunk]) == 1;
+        pthread_mutex_unlock(video->main_file_mutex + chunk);
+        if (!ok || h[0] != 0xFF || h[1] != 0x01) continue;
+
+        int planes = 0, subbands = 0;
+        for (uint32_t o = 12; o + 12 <= n && h[o] == 0xFF && (h[o + 1] == 0x02 || h[o + 1] == 0x03); o += 12)
+        {
+            if (h[o + 1] == 0x02) planes++;
+            else subbands++;
+        }
+        if (planes == 4 && subbands && subbands % 4 == 0 && (subbands / 4 - 1) % 3 == 0)
+        {
+            return (subbands / 4 - 1) / 3;
+        }
+    }
+    return -1;
+}
+
 int openMlvClip(mlvObject_t * video, char * mlvPath, int open_mode, char * error_message)
 {
     video->path = malloc( strlen(mlvPath) + 1 );
@@ -2658,6 +2691,9 @@ short_cut:
     llrpSetDualIsoValidity(video, 0);
 
 preview_out:
+
+    /* CRX: lossless or C-RAW, for the clip info */
+    video->crx_levels = (!(isMcrawLoaded(video)) && isMlvCrx(video)) ? crx_probe_levels(video) : -1;
 
     /* NON compressed frame size */
     video->frame_size = (getMlvHeight(video) * getMlvWidth(video) * getMlvBitdepth(video)) / 8;

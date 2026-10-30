@@ -100,6 +100,7 @@ typedef struct {
     uint32_t    frames;          /* Number of frames */
     uint32_t    frame_size;      /* NOT counting compression factor */
     int         compression_type;  /* mcraw compression type. legacy/binned: 6, default: 7 */
+    int         crx_levels;      /* CRX: DWT levels of the samples (0 lossless, 3 C-RAW), -1 unknown */
     frame_index_t * video_index;
 
     /* Audio info */
